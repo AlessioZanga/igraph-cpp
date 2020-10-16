@@ -4,6 +4,8 @@
 
 namespace igraph {
 
+namespace structures {
+
 void igraph_error_handler_exception(const char *reason, const char *file, int line, int igraph_errno) {
     std::ostringstream out;
     out << "Exception at " << file << ":" << line << " :";
@@ -36,13 +38,13 @@ Graph::Graph(const Edges &edges, bool mode) {
     igraph_empty(&graph, nodes.size(), mode);
 
     size_t i = 0;
-    for (Node n : nodes) {
+    for (Node n: nodes) {
         set_node_attribute(i, "label", n);
         i++;
     }
 
     sync_nodes_labels();
-
+    
     for (Edge e : edges) add_edge(e.first, e.second);
 }
 
@@ -68,6 +70,45 @@ Graph::Graph(const igraph_t *other) {
     sync_nodes_labels();
 }
 
+Graph::Graph(const std::string &formula, bool mode) {
+    Nodes nodes;
+    Edges edges;
+
+    std::regex delim("\\[|\\]|\\||\\:");
+    std::regex regex("\\[(\\w+)\\]|\\[(\\w+)\\|(\\w+)([:\\w+]+)*\\]");
+    auto regex_begin = std::sregex_iterator(formula.begin(), formula.end(), regex);
+    auto regex_end = std::sregex_iterator();
+
+    if (regex_begin == regex_end) throw std::runtime_error("Invalid formula string.");
+
+    for (auto i = regex_begin; i != regex_end; ++i) {
+        std::string s = i->str();
+        auto match_begin = std::sregex_token_iterator(s.begin(), s.end(), delim, -1);
+        auto match_end = std::sregex_token_iterator();
+
+        std::sregex_token_iterator match_child = match_end;
+        for (auto match_current = match_begin; match_current != match_end; ++match_current) {
+            std::string parent = match_current->str();
+            if (parent.length() > 0) {
+                if (match_child == match_end) match_child = match_current;
+                if (std::find(nodes.begin(), nodes.end(), parent) == nodes.end()) {
+                    nodes.push_back(parent);
+                }
+                if (match_current != match_child) {
+                    edges.push_back({parent, match_child->str()});
+                }
+            }
+        }
+    }
+
+    igraph_empty(&graph, nodes.size(), mode);
+    for (size_t i = 0; i < nodes.size(); i++) {
+        set_node_attribute(i, "label", nodes[i]);
+    }
+    sync_nodes_labels();
+    for (auto e : edges) add_edge(e.first, e.second);
+}
+
 void Graph::sync_nodes_labels() {
     vid2label.clear();
     label2vid.clear();
@@ -76,7 +117,7 @@ void Graph::sync_nodes_labels() {
         try {
             label = get_node_attribute(i, "label");
             if (label.size() <= 0) throw std::runtime_error("Invalid node label.");
-        } catch (const std::exception &e) {
+        } catch(const std::exception& e) {
             label = std::to_string(i);
             set_node_attribute(i, "label", label);
         }
@@ -93,7 +134,9 @@ void Graph::set_node_attribute(size_t id, const std::string &key, const std::str
     igraph_cattribute_VAS_set(&graph, key.c_str(), id, value.c_str());
 }
 
-Nodes Graph::get_nodes() const { return vid2label; }
+Nodes Graph::get_nodes() const {
+    return vid2label;
+}
 
 void Graph::set_nodes(const Nodes &labels) {
     for (size_t i = 0; i < labels.size(); i++) {
@@ -112,7 +155,9 @@ Edges Graph::get_edges() const {
     return edges;
 }
 
-bool Graph::has_node(const Node &label) const { return label2vid.find(label) != label2vid.end(); }
+bool Graph::has_node(const Node &label) const {
+    return label2vid.find(label) != label2vid.end();
+}
 
 void Graph::add_node(const Node &label) {
     if (label2vid.find(label) != label2vid.end()) throw std::runtime_error("Node already exists.");
@@ -146,7 +191,13 @@ void Graph::remove_edge(const Node &from, const Node &to) {
     if (label2vid.find(to) == label2vid.end()) throw std::runtime_error("Node does not exist.");
     if (!has_edge(from, to)) throw std::runtime_error("Edge does not exist.");
     igraph_es_t es;
-    igraph_es_pairs_small(&es, is_directed(), label2vid[from], label2vid[to], -1);
+    igraph_es_pairs_small(
+        &es,
+        is_directed(),
+        label2vid[from],
+        label2vid[to],
+        -1
+    );
     igraph_delete_edges(&graph, es);
     igraph_es_destroy(&es);
 }
@@ -180,8 +231,15 @@ bool Graph::is_chordal() const {
 
 bool Graph::is_complete() const {
     for (Node node : get_nodes())
-        if (neighbors(node).size() < size() - 1) return false;
+        if (neighbors(node).size() < size() - 1)
+            return false;
     return true;
+}
+
+bool Graph::is_reachable(const Node &from, const Node &to) const {
+    igraph_bool_t out;
+    igraph_are_connected(&graph, label2vid.at(from), label2vid.at(to), &out);
+    return out;
 }
 
 Nodes Graph::neighbors(const Node &label) const {
@@ -200,16 +258,15 @@ Nodes Graph::boundary(const Nodes &labels) const {
     Nodes out;
     std::set<Node> boundary;
     for (Node bound : labels)
-        for (Node neighbor : neighbors(bound)) boundary.insert(neighbor);
-    std::set_difference(boundary.begin(), boundary.end(), labels.begin(), labels.end(),
-                        std::inserter(out, out.begin()));
-    return out;
-}
-
-FILE *Graph::open_dot_file() const {
-    FILE *out = std::tmpfile();
-    igraph_write_graph_dot(&graph, out);
-    rewind(out);
+        for (Node neighbor : neighbors(bound))
+            boundary.insert(neighbor);
+    std::set_difference(
+        boundary.begin(),
+        boundary.end(),
+        labels.begin(),
+        labels.end(),
+        std::inserter(out, out.begin())
+    );
     return out;
 }
 
@@ -217,27 +274,39 @@ std::string Graph::__repr__() const {
     size_t size;
     char *buffer;
     std::stringstream out;
-    FILE *tmp = open_dot_file();
+    FILE *tmp = std::tmpfile();
+    igraph_write_graph_dot(&graph, tmp);
+    rewind(tmp);
     if (tmp) {
         fseek(tmp, 0, SEEK_END);
         size = ftell(tmp);
         fseek(tmp, 0, SEEK_SET);
-        buffer = (char *)malloc(size);
-        if (buffer) size = fread(buffer, 1, size, tmp);
+        buffer = (char *) malloc(size);
+        if (buffer) size = fread(buffer, sizeof(char), size, tmp);
         fclose(tmp);
     }
     if (buffer) {
         out << buffer;
         free(buffer);
     }
-    return out.str();
+    std::string printable = out.str();
+    return printable.substr(0, printable.rfind('}') + 1);
 }
 
 Graph Graph::random(size_t nodes, double edge_probability) {
     igraph_t graph;
-    igraph_erdos_renyi_game(&graph, IGRAPH_ERDOS_RENYI_GNP, nodes, edge_probability, IGRAPH_UNDIRECTED, false);
+    igraph_erdos_renyi_game(
+        &graph,
+        IGRAPH_ERDOS_RENYI_GNP,
+        nodes,
+        edge_probability,
+        IGRAPH_UNDIRECTED,
+        false
+    );
     Graph out(&graph);
     return out;
 }
+
+}  // namespace structures
 
 }  // namespace igraph

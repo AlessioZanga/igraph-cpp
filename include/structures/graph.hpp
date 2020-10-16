@@ -23,13 +23,12 @@ using Nodes = std::vector<Node>;
 using Edge = std::pair<Node, Node>;
 using Edges = std::vector<Edge>;
 
+namespace structures {
+
 class DirectedGraph;
 
 class Graph {
     friend DirectedGraph;
-
-   private:
-    FILE *open_dot_file() const;
 
    protected:
     igraph_t graph;
@@ -44,6 +43,7 @@ class Graph {
 
    public:
     Graph();
+    Graph(const std::string &formula, bool mode = IGRAPH_UNDIRECTED);
     Graph(const Nodes &labels, bool mode = IGRAPH_UNDIRECTED);
     Graph(const Edges &edges, bool mode = IGRAPH_UNDIRECTED);
     Graph(const Graph &other);
@@ -69,6 +69,9 @@ class Graph {
     bool is_directed() const;
     bool is_chordal() const;
     bool is_complete() const;
+    
+    [[deprecated]]
+    bool is_reachable(const Node &from, const Node &to) const;
 
     Nodes neighbors(const Node &label) const;
     Nodes boundary(const Nodes &labels) const;
@@ -81,5 +84,7 @@ class Graph {
 
     static Graph random(size_t nodes, double edge_probability);
 };
+
+}  // namespace structures
 
 }  // namespace igraph

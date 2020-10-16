@@ -1,11 +1,12 @@
 #include <gtest/gtest.h>
 
-#include "graph.ipp"
+#include "structures/graph.ipp"
 
 #define N {"1", "2", "3", "4", "5"}
 #define N_SIZE 5
 
 using namespace igraph;
+using namespace igraph::structures;
 
 TEST(TestGraph, DefaultContructor) {
     Graph g0, g1(N);
@@ -28,6 +29,21 @@ TEST(TestGraph, Destructor) {
     Graph *g = new Graph(N);
     ASSERT_EQ(g->size(), N_SIZE);
     delete g;
+}
+
+TEST(TestGraph, FormulaConstructor) {
+    Nodes nodes = {"A", "B", "C", "D"};
+    Edges edges = {
+        {"A", "B"},
+        {"A", "C"},
+        {"B", "C"},
+        {"A", "D"},
+        {"B", "D"},
+        {"C", "D"}
+    };
+    Graph g("[A][B|A][C|A:B][D|A:B:C]");
+    ASSERT_EQ(g.get_nodes(), nodes);
+    ASSERT_EQ(g.get_edges(), edges);
 }
 
 TEST(TestGraph, EdgesConstructor) {
@@ -96,7 +112,10 @@ TEST(TestGraph, RemoveNode) {
 }
 
 TEST(TestGraph, HasEdge) {
-    FAIL();
+    Graph g("[A|B][B|C][C|D][D|A]");
+    ASSERT_TRUE(g.has_edge("A", "B"));
+    ASSERT_TRUE(g.has_edge("B", "A"));
+    ASSERT_FALSE(g.has_edge("B", "D"));
 }
 
 TEST(TestGraph, AddEdge) {
@@ -137,17 +156,23 @@ TEST(TestGraph, IsDirected) {
 }
 
 TEST(TestGraph, IsChordal) {
-    FAIL();
+    Graph g0("[A|B][B|C][C|D][D|A]"), g1("[A|B][B|C][C|A]");
+    ASSERT_FALSE(g0.is_chordal());
+    ASSERT_TRUE(g1.is_chordal());
 }
 
 TEST(TestGraph, IsComplete) {
-    FAIL();
+    Graph g0("[A|B][B|C]"), g1("[A|B][B|C][A|C]");
+    ASSERT_FALSE(g0.is_complete());
+    ASSERT_TRUE(g1.is_complete());
 }
 
 TEST(TestGraph, Neighbors) {
-    FAIL();
+    Graph g("[A][B|A][C|A:B][D|A:B:C]");
+    ASSERT_EQ(g.neighbors("A"), Nodes({"B", "C", "D"}));
 }
 
 TEST(TestGraph, Boundary) {
-    FAIL();
+    Graph g("[A|B:E][B|C][C|D][D|E:G:H][E|F][F|G]");
+    ASSERT_EQ(g.boundary({"D", "E"}), Nodes({"A", "C", "F", "G", "H"}));
 }

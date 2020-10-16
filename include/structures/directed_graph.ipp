@@ -4,7 +4,11 @@
 
 namespace igraph {
 
+namespace structures {
+
 DirectedGraph::DirectedGraph() : Graph() { igraph_to_directed(&graph, IGRAPH_TO_DIRECTED_MUTUAL); }
+
+DirectedGraph::DirectedGraph(const std::string &formula) : Graph(formula, IGRAPH_DIRECTED) {}
 
 DirectedGraph::DirectedGraph(const Nodes &labels) : Graph(labels, IGRAPH_DIRECTED) {}
 
@@ -43,6 +47,11 @@ Graph DirectedGraph::to_undirected() const {
     Graph out(&undirected);
     igraph_destroy(&undirected);
     return out;
+}
+
+void DirectedGraph::reverse_edge(const Node &from, const Node &to) {
+    remove_edge(from, to);
+    add_edge(to, from);
 }
 
 Nodes DirectedGraph::parents(const Node &label) const {
@@ -103,9 +112,18 @@ Nodes DirectedGraph::descendants(const Node &label) const {
 
 DirectedGraph DirectedGraph::random(size_t nodes, double edge_probability) {
     igraph_t graph;
-    igraph_erdos_renyi_game(&graph, IGRAPH_ERDOS_RENYI_GNP, nodes, edge_probability, IGRAPH_DIRECTED, false);
+    igraph_erdos_renyi_game(
+        &graph,
+        IGRAPH_ERDOS_RENYI_GNP,
+        nodes,
+        edge_probability,
+        IGRAPH_DIRECTED,
+        false
+    );
     DirectedGraph out(&graph);
     return out;
 }
+
+}  // namespace structures
 
 }  // namespace igraph
