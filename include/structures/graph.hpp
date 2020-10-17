@@ -34,7 +34,7 @@ class Graph {
     igraph_t graph;
     std::vector<Node> labels;
     std::unordered_map<Node, size_t> index;
-    void sync_nodes_labels();
+    void reset_index_labels();
 
     std::string get_node_attribute(size_t id, const std::string &key) const;
     void set_node_attribute(size_t id, const std::string &key, const std::string &value);

@@ -23,7 +23,7 @@ Graph::Graph(const Nodes &nodes, bool mode) {
     for (size_t i = 0; i < nodes.size(); i++) {
         set_node_attribute(i, "label", nodes[i]);
     }
-    sync_nodes_labels();
+    reset_index_labels();
 }
 
 Graph::Graph(const Edges &edges, bool mode) {
@@ -38,19 +38,19 @@ Graph::Graph(const Edges &edges, bool mode) {
     igraph_empty(&graph, nodes.size(), mode);
 
     size_t i = 0;
-    for (Node n: nodes) {
-        set_node_attribute(i, "label", n);
+    for (Node node : nodes) {
+        set_node_attribute(i, "label", node);
         i++;
     }
 
-    sync_nodes_labels();
+    reset_index_labels();
     
     for (Edge e : edges) add_edge(e.first, e.second);
 }
 
 Graph::Graph(const Graph &other) {
     igraph_copy(&graph, &other.graph);
-    sync_nodes_labels();
+    reset_index_labels();
 }
 
 Graph &Graph::operator=(const Graph &other) {
@@ -67,7 +67,7 @@ Graph::~Graph() { igraph_destroy(&graph); }
 
 Graph::Graph(const igraph_t *other) {
     igraph_copy(&graph, other);
-    sync_nodes_labels();
+    reset_index_labels();
 }
 
 Graph::Graph(const std::string &formula, bool mode) {
@@ -105,19 +105,19 @@ Graph::Graph(const std::string &formula, bool mode) {
     for (size_t i = 0; i < nodes.size(); i++) {
         set_node_attribute(i, "label", nodes[i]);
     }
-    sync_nodes_labels();
+    reset_index_labels();
     for (auto e : edges) add_edge(e.first, e.second);
 }
 
-void Graph::sync_nodes_labels() {
+void Graph::reset_index_labels() {
     labels.clear();
     index.clear();
     for (size_t i = 0; i < size(); i++) {
-        std::string label;
+        Node label;
         try {
             label = get_node_attribute(i, "label");
             if (label.size() <= 0) throw std::runtime_error("Invalid node label.");
-        } catch(const std::exception& e) {
+        } catch (const std::exception& e) {
             label = std::to_string(i);
             set_node_attribute(i, "label", label);
         }
@@ -142,7 +142,7 @@ void Graph::set_nodes(const Nodes &nodes) {
     for (size_t i = 0; i < nodes.size(); i++) {
         set_node_attribute(i, "label", nodes[i]);
     }
-    sync_nodes_labels();
+    reset_index_labels();
 }
 
 Edges Graph::get_edges() const {
@@ -163,13 +163,13 @@ void Graph::add_node(const Node &node) {
     if (index.find(node) != index.end()) throw std::runtime_error("Node already exists.");
     igraph_add_vertices(&graph, 1, 0);
     set_node_attribute(size() - 1, "label", node);
-    sync_nodes_labels();
+    reset_index_labels();
 }
 
 void Graph::remove_node(const Node &node) {
     if (index.find(node) == index.end()) throw std::runtime_error("Node does not exist.");
     igraph_delete_vertices(&graph, igraph_vss_1(index[node]));
-    sync_nodes_labels();
+    reset_index_labels();
 }
 
 bool Graph::has_edge(const Node &from, const Node &to) const {
