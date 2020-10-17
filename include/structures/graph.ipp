@@ -18,10 +18,10 @@ static size_t igraph_attribute_table = (size_t)igraph_i_set_attribute_table(&igr
 
 Graph::Graph() { igraph_empty(&graph, 0, IGRAPH_UNDIRECTED); }
 
-Graph::Graph(const Nodes &labels, bool mode) {
-    igraph_empty(&graph, labels.size(), mode);
-    for (size_t i = 0; i < labels.size(); i++) {
-        set_node_attribute(i, "label", labels[i]);
+Graph::Graph(const Nodes &nodes, bool mode) {
+    igraph_empty(&graph, nodes.size(), mode);
+    for (size_t i = 0; i < nodes.size(); i++) {
+        set_node_attribute(i, "label", nodes[i]);
     }
     sync_nodes_labels();
 }
@@ -57,8 +57,8 @@ Graph &Graph::operator=(const Graph &other) {
     if (this != &other) {
         Graph tmp(other);
         std::swap(tmp.graph, graph);
-        std::swap(tmp.vid2label, vid2label);
-        std::swap(tmp.label2vid, label2vid);
+        std::swap(tmp.labels, labels);
+        std::swap(tmp.index, index);
     }
     return *this;
 }
@@ -110,8 +110,8 @@ Graph::Graph(const std::string &formula, bool mode) {
 }
 
 void Graph::sync_nodes_labels() {
-    vid2label.clear();
-    label2vid.clear();
+    labels.clear();
+    index.clear();
     for (size_t i = 0; i < size(); i++) {
         std::string label;
         try {
@@ -121,8 +121,8 @@ void Graph::sync_nodes_labels() {
             label = std::to_string(i);
             set_node_attribute(i, "label", label);
         }
-        vid2label.push_back(label);
-        label2vid[label] = i;
+        labels.push_back(label);
+        index[label] = i;
     }
 }
 
@@ -135,12 +135,12 @@ void Graph::set_node_attribute(size_t id, const std::string &key, const std::str
 }
 
 Nodes Graph::get_nodes() const {
-    return vid2label;
+    return labels;
 }
 
-void Graph::set_nodes(const Nodes &labels) {
-    for (size_t i = 0; i < labels.size(); i++) {
-        set_node_attribute(i, "label", labels[i]);
+void Graph::set_nodes(const Nodes &nodes) {
+    for (size_t i = 0; i < nodes.size(); i++) {
+        set_node_attribute(i, "label", nodes[i]);
     }
     sync_nodes_labels();
 }
@@ -150,70 +150,70 @@ Edges Graph::get_edges() const {
     int from, to;
     for (int i = 0; i < igraph_ecount(&graph); i++) {
         igraph_edge(&graph, i, &from, &to);
-        edges.push_back({vid2label[from], vid2label[to]});
+        edges.push_back({labels[from], labels[to]});
     }
     return edges;
 }
 
-bool Graph::has_node(const Node &label) const {
-    return label2vid.find(label) != label2vid.end();
+bool Graph::has_node(const Node &node) const {
+    return index.find(node) != index.end();
 }
 
-void Graph::add_node(const Node &label) {
-    if (label2vid.find(label) != label2vid.end()) throw std::runtime_error("Node already exists.");
+void Graph::add_node(const Node &node) {
+    if (index.find(node) != index.end()) throw std::runtime_error("Node already exists.");
     igraph_add_vertices(&graph, 1, 0);
-    set_node_attribute(size() - 1, "label", label);
+    set_node_attribute(size() - 1, "label", node);
     sync_nodes_labels();
 }
 
-void Graph::remove_node(const Node &label) {
-    if (label2vid.find(label) == label2vid.end()) throw std::runtime_error("Node does not exist.");
-    igraph_delete_vertices(&graph, igraph_vss_1(label2vid[label]));
+void Graph::remove_node(const Node &node) {
+    if (index.find(node) == index.end()) throw std::runtime_error("Node does not exist.");
+    igraph_delete_vertices(&graph, igraph_vss_1(index[node]));
     sync_nodes_labels();
 }
 
 bool Graph::has_edge(const Node &from, const Node &to) const {
     int edge;
-    if (label2vid.find(from) == label2vid.end()) throw std::runtime_error("Node does not exist.");
-    if (label2vid.find(to) == label2vid.end()) throw std::runtime_error("Node does not exist.");
-    igraph_get_eid(&graph, &edge, label2vid.at(from), label2vid.at(to), is_directed(), false);
+    if (index.find(from) == index.end()) throw std::runtime_error("Node does not exist.");
+    if (index.find(to) == index.end()) throw std::runtime_error("Node does not exist.");
+    igraph_get_eid(&graph, &edge, index.at(from), index.at(to), is_directed(), false);
     return edge >= 0;
 }
 
 void Graph::add_edge(const Node &from, const Node &to) {
-    if (label2vid.find(from) == label2vid.end()) throw std::runtime_error("Node does not exist.");
-    if (label2vid.find(to) == label2vid.end()) throw std::runtime_error("Node does not exist.");
-    if (!has_edge(from, to)) igraph_add_edge(&graph, label2vid[from], label2vid[to]);
+    if (index.find(from) == index.end()) throw std::runtime_error("Node does not exist.");
+    if (index.find(to) == index.end()) throw std::runtime_error("Node does not exist.");
+    if (!has_edge(from, to)) igraph_add_edge(&graph, index[from], index[to]);
 }
 
 void Graph::remove_edge(const Node &from, const Node &to) {
-    if (label2vid.find(from) == label2vid.end()) throw std::runtime_error("Node does not exist.");
-    if (label2vid.find(to) == label2vid.end()) throw std::runtime_error("Node does not exist.");
+    if (index.find(from) == index.end()) throw std::runtime_error("Node does not exist.");
+    if (index.find(to) == index.end()) throw std::runtime_error("Node does not exist.");
     if (!has_edge(from, to)) throw std::runtime_error("Edge does not exist.");
     igraph_es_t es;
     igraph_es_pairs_small(
         &es,
         is_directed(),
-        label2vid[from],
-        label2vid[to],
+        index[from],
+        index[to],
         -1
     );
     igraph_delete_edges(&graph, es);
     igraph_es_destroy(&es);
 }
 
-Graph Graph::subgraph(const Nodes &labels) const {
+Graph Graph::subgraph(const Nodes &nodes) const {
     igraph_t subgraph;
     igraph_vs_t select;
-    igraph_vector_t nodes;
-    igraph_vector_init(&nodes, labels.size());
-    for (size_t i = 0; i < labels.size(); i++) {
-        VECTOR(nodes)[i] = label2vid.at(labels[i]);
+    igraph_vector_t vector;
+    igraph_vector_init(&vector, nodes.size());
+    for (size_t i = 0; i < nodes.size(); i++) {
+        VECTOR(vector)[i] = index.at(nodes[i]);
     }
-    igraph_vs_vector(&select, &nodes);
+    igraph_vs_vector(&select, &vector);
     igraph_induced_subgraph(&graph, &subgraph, select, IGRAPH_SUBGRAPH_AUTO);
     igraph_vs_destroy(&select);
-    igraph_vector_destroy(&nodes);
+    igraph_vector_destroy(&vector);
     Graph out(&subgraph);
     igraph_destroy(&subgraph);
     return out;
@@ -238,33 +238,33 @@ bool Graph::is_complete() const {
 
 bool Graph::is_reachable(const Node &from, const Node &to) const {
     igraph_bool_t out;
-    igraph_are_connected(&graph, label2vid.at(from), label2vid.at(to), &out);
+    igraph_are_connected(&graph, index.at(from), index.at(to), &out);
     return out;
 }
 
-Nodes Graph::neighbors(const Node &label) const {
+Nodes Graph::neighbors(const Node &node) const {
     Nodes out;
     igraph_vector_t neighbors;
     igraph_vector_init(&neighbors, 0);
-    igraph_neighbors(&graph, &neighbors, label2vid.at(label), IGRAPH_ALL);
+    igraph_neighbors(&graph, &neighbors, index.at(node), IGRAPH_ALL);
     for (int64_t i = 0; i < igraph_vector_size(&neighbors); i++) {
-        out.push_back(vid2label[VECTOR(neighbors)[i]]);
+        out.push_back(labels[VECTOR(neighbors)[i]]);
     }
     igraph_vector_destroy(&neighbors);
     return out;
 }
 
-Nodes Graph::boundary(const Nodes &labels) const {
+Nodes Graph::boundary(const Nodes &nodes) const {
     Nodes out;
     std::set<Node> boundary;
-    for (Node bound : labels)
+    for (Node bound : nodes)
         for (Node neighbor : neighbors(bound))
             boundary.insert(neighbor);
     std::set_difference(
         boundary.begin(),
         boundary.end(),
-        labels.begin(),
-        labels.end(),
+        nodes.begin(),
+        nodes.end(),
         std::inserter(out, out.begin())
     );
     return out;

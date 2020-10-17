@@ -15,7 +15,7 @@ std::vector<Nodes> maximal_cliques(const Graph &other) {
         Nodes clique;
         igraph_vector_t *vector = (igraph_vector_t *) VECTOR(cliques)[i];
         for (int j = 0; j < igraph_vector_size(vector); j++) {
-            clique.push_back(other.vid2label[(vector)->stor_begin[j]]);
+            clique.push_back(other.labels[(vector)->stor_begin[j]]);
         }
         out.push_back(clique);
     }

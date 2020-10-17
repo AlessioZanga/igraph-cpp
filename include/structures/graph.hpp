@@ -32,8 +32,8 @@ class Graph {
 
    protected:
     igraph_t graph;
-    std::vector<Node> vid2label;
-    std::unordered_map<Node, size_t> label2vid;
+    std::vector<Node> labels;
+    std::unordered_map<Node, size_t> index;
     void sync_nodes_labels();
 
     std::string get_node_attribute(size_t id, const std::string &key) const;
@@ -44,26 +44,26 @@ class Graph {
    public:
     Graph();
     Graph(const std::string &formula, bool mode = IGRAPH_UNDIRECTED);
-    Graph(const Nodes &labels, bool mode = IGRAPH_UNDIRECTED);
+    Graph(const Nodes &nodes, bool mode = IGRAPH_UNDIRECTED);
     Graph(const Edges &edges, bool mode = IGRAPH_UNDIRECTED);
     Graph(const Graph &other);
     Graph &operator=(const Graph &other);
     virtual ~Graph();
 
-    void set_nodes(const Nodes &labels);
+    void set_nodes(const Nodes &nodes);
     Nodes get_nodes() const;
 
     Edges get_edges() const;
 
-    bool has_node(const Node &label) const;
-    void add_node(const Node &label);
-    void remove_node(const Node &label);
+    bool has_node(const Node &node) const;
+    void add_node(const Node &node);
+    void remove_node(const Node &node);
 
     bool has_edge(const Node &from, const Node &to) const;
     void add_edge(const Node &from, const Node &to);
     void remove_edge(const Node &from, const Node &to);
 
-    Graph subgraph(const Nodes &labels) const;
+    Graph subgraph(const Nodes &nodes) const;
 
     size_t size() const;
     bool is_directed() const;
@@ -73,8 +73,8 @@ class Graph {
     [[deprecated]]
     bool is_reachable(const Node &from, const Node &to) const;
 
-    Nodes neighbors(const Node &label) const;
-    Nodes boundary(const Nodes &labels) const;
+    Nodes neighbors(const Node &node) const;
+    Nodes boundary(const Nodes &nodes) const;
 
     friend Graph chordal(const Graph &other);
     friend std::vector<Nodes> maximal_cliques(const Graph &other);

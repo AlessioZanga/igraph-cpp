@@ -10,7 +10,7 @@ DirectedGraph::DirectedGraph() : Graph() { igraph_to_directed(&graph, IGRAPH_TO_
 
 DirectedGraph::DirectedGraph(const std::string &formula) : Graph(formula, IGRAPH_DIRECTED) {}
 
-DirectedGraph::DirectedGraph(const Nodes &labels) : Graph(labels, IGRAPH_DIRECTED) {}
+DirectedGraph::DirectedGraph(const Nodes &nodes) : Graph(nodes, IGRAPH_DIRECTED) {}
 
 DirectedGraph::DirectedGraph(const Edges &edges) : Graph(edges, IGRAPH_DIRECTED) {}
 
@@ -24,8 +24,8 @@ DirectedGraph &DirectedGraph::operator=(const DirectedGraph &other) {
     if (this != &other) {
         DirectedGraph tmp(other);
         std::swap(tmp.graph, graph);
-        std::swap(tmp.vid2label, vid2label);
-        std::swap(tmp.label2vid, label2vid);
+        std::swap(tmp.labels, labels);
+        std::swap(tmp.index, index);
     }
     return *this;
 }
@@ -54,39 +54,39 @@ void DirectedGraph::reverse_edge(const Node &from, const Node &to) {
     add_edge(to, from);
 }
 
-Nodes DirectedGraph::parents(const Node &label) const {
+Nodes DirectedGraph::parents(const Node &node) const {
     Nodes out;
     igraph_vector_t parents;
     igraph_vector_init(&parents, 0);
-    igraph_neighbors(&graph, &parents, label2vid.at(label), IGRAPH_IN);
+    igraph_neighbors(&graph, &parents, index.at(node), IGRAPH_IN);
     for (int64_t i = 0; i < igraph_vector_size(&parents); i++) {
-        out.push_back(vid2label[VECTOR(parents)[i]]);
+        out.push_back(labels[VECTOR(parents)[i]]);
     }
     igraph_vector_destroy(&parents);
     return out;
 }
 
-Nodes DirectedGraph::family(const Node &label) const {
-    Nodes out = parents(label);
-    out.push_back(label);
+Nodes DirectedGraph::family(const Node &node) const {
+    Nodes out = parents(node);
+    out.push_back(node);
     return out;
 }
 
-Nodes DirectedGraph::children(const Node &label) const {
+Nodes DirectedGraph::children(const Node &node) const {
     Nodes out;
     igraph_vector_t children;
     igraph_vector_init(&children, 0);
-    igraph_neighbors(&graph, &children, label2vid.at(label), IGRAPH_OUT);
+    igraph_neighbors(&graph, &children, index.at(node), IGRAPH_OUT);
     for (int64_t i = 0; i < igraph_vector_size(&children); i++) {
-        out.push_back(vid2label[VECTOR(children)[i]]);
+        out.push_back(labels[VECTOR(children)[i]]);
     }
     igraph_vector_destroy(&children);
     return out;
 }
 
-Nodes DirectedGraph::ancestors(const Node &label) const {
+Nodes DirectedGraph::ancestors(const Node &node) const {
     std::set<Node> ancestors;
-    std::list<Node> queue({label});
+    std::list<Node> queue({node});
     while (!queue.empty()) {
         Nodes parent = parents(queue.front());
         ancestors.insert(parent.begin(), parent.end());
@@ -97,9 +97,9 @@ Nodes DirectedGraph::ancestors(const Node &label) const {
     return out;
 }
 
-Nodes DirectedGraph::descendants(const Node &label) const {
+Nodes DirectedGraph::descendants(const Node &node) const {
     std::set<Node> descendants;
-    std::list<Node> queue({label});
+    std::list<Node> queue({node});
     while (!queue.empty()) {
         Nodes child = children(queue.front());
         descendants.insert(child.begin(), child.end());
